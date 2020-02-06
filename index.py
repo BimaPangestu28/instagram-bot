@@ -3,9 +3,13 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.expected_conditions import presence_of_element_located, presence_of_all_elements_located
+from pathlib import Path
+from datetime import datetime
 import platform
 import traceback
+import xlsxwriter
 import time
+import os
 
 
 class InstagramBot():
@@ -25,6 +29,30 @@ class InstagramBot():
         self.browserWait = WebDriverWait(self.browser, 10)
         self.username = username
         self.password = password
+
+    def generateExcelReport(self, name, urls):
+        if not os.path.exists("reports"):
+            os.makedirs("reports")
+
+        workbook = xlsxwriter.Workbook(
+            'reports/{}.xlsx'.format(name.replace(" ", "-")))
+        worksheet = workbook.add_worksheet()
+        bold = workbook.add_format({'bold': True})
+        worksheet.write(0, 0, 'No', bold)
+        worksheet.write(0, 1, 'Username', bold)
+        worksheet.write(0, 2, 'Link', bold)
+        row_cell = 1
+
+        for url in urls:
+            name = url.split("https://www.instagram.com/")[1].split("/")[0]
+
+            worksheet.write(row_cell, 0, row_cell)
+            worksheet.write(row_cell, 1, name)
+            worksheet.write(row_cell, 2, url)
+
+            row_cell += 1
+
+        workbook.close()
 
     def signIn(self):
         self.browser.get("https://www.instagram.com/accounts/login/")
@@ -87,7 +115,8 @@ class InstagramBot():
             actionChain.key_down(Keys.SPACE).key_up(Keys.SPACE).perform()
             numberOfPostInList = len(
                 self.browser.find_elements_by_class_name("v1Nh3"))
-            print(numberOfPostInList)
+
+        urls = []
 
         for post in self.browser.find_elements_by_class_name("v1Nh3"):
             post.click()
@@ -98,6 +127,8 @@ class InstagramBot():
                 presence_of_element_located((By.CLASS_NAME, "FPmhX")))
             if followButton.text != "Following":
                 followButton.click()
+
+                urls.append(username.get_attribute('href'))
 
                 print("Success following {}".format(
                     username.get_attribute("title")))
@@ -112,13 +143,18 @@ class InstagramBot():
             closeButton[-1].click()
             time.sleep(2)
 
+        self.generateExcelReport(
+            "follow-form-tag-{}-{}".format(tag, datetime.today().strftime("%d-%m-%Y")), urls)
+
     def followFromAutoherUser(self, username, max, interval):
         self.browser.get('https://www.instagram.com/' + username)
         followersLink = self.browser.find_element_by_css_selector('ul li a')
         followersLink.click()
         time.sleep(2)
+
         followersList = self.browser.find_element_by_css_selector(
             'div[role=\'dialog\'] ul')
+
         numberOfFollowersInList = len(
             followersList.find_elements_by_css_selector('li'))
 
@@ -131,59 +167,57 @@ class InstagramBot():
             actionChain.key_down(Keys.SPACE).key_up(Keys.SPACE).perform()
             numberOfFollowersInList = len(
                 followersList.find_elements_by_css_selector('li'))
-            print(numberOfFollowersInList)
 
         followers = []
         for user in followersList.find_elements_by_css_selector('li'):
             userLink = user.find_element_by_css_selector(
                 'a').get_attribute('href')
-            username = user.find_element_by_css_selector('a').text
+            name = user.find_element_by_css_selector('a').text
 
             try:
-                followButton = user.find_element_by_xpath("div/div[3]/button")
+                followButton = user.find_element_by_xpath("div/div[2]/button")
 
                 if followButton.text != "Following":
+                    followers.append(userLink)
                     followButton.click()
 
-                    print("Success following {}".format(username))
+                    print("Success following {}".format(name))
                 else:
-                    print("You're already following {}".format(username))
+                    print("You're already following {}".format(name))
 
                 time.sleep(interval)
             except Exception as identifier:
                 pass
 
-            followers.append(userLink)
-
             if (len(followers) == max):
                 break
 
-        return followers
+        self.generateExcelReport("follow-from-another-user-{}-{}".format(username, datetime.today().strftime("%d-%m-%Y")), followers)
 
     def unfollowFromFollowing(self, max, interval):
         self.browser.get(
             'https://www.instagram.com/{}/following/'.format(self.username))
-        followingsLink = self.browser.find_elements_by_class_name('-nal3')[-1]
-        followingsLink.click()
+        unfollowingsLink = self.browser.find_elements_by_class_name('-nal3')[-1]
+        unfollowingsLink.click()
         time.sleep(2)
-        followingsList = self.browser.find_element_by_css_selector(
+        unfollowingsList = self.browser.find_element_by_css_selector(
             'div[role=\'dialog\'] ul')
-        numberOffollowingsInList = len(
-            followingsList.find_elements_by_css_selector('li'))
+        numberOfunfollowingsInList = len(
+            unfollowingsList.find_elements_by_css_selector('li'))
 
-        followingsList.click()
+        unfollowingsList.click()
         actionChain = webdriver.ActionChains(self.browser)
-        while (numberOffollowingsInList < max):
+        while (numberOfunfollowingsInList < max):
             actionChain.key_down(Keys.CONTROL).click(
-                followingsList).key_up(Keys.CONTROL).perform()
+                unfollowingsList).key_up(Keys.CONTROL).perform()
 
             actionChain.key_down(Keys.SPACE).key_up(Keys.SPACE).perform()
-            numberOffollowingsInList = len(
-                followingsList.find_elements_by_css_selector('li'))
-            print(numberOffollowingsInList)
+            numberOfunfollowingsInList = len(
+                unfollowingsList.find_elements_by_css_selector('li'))
+            print(numberOfunfollowingsInList)
 
-        followings = []
-        for user in followingsList.find_elements_by_css_selector('li'):
+        unfollowings = []
+        for user in unfollowingsList.find_elements_by_css_selector('li'):
             userLink = user.find_element_by_css_selector(
                 'a').get_attribute('href')
             username = user.find_element_by_css_selector('a').text
@@ -199,6 +233,8 @@ class InstagramBot():
                         presence_of_element_located((By.CLASS_NAME, '-Cab_')))
                     confirmationButton.click()
 
+                    unfollowings.append(userLink)
+
                     print("Success unfollowing {}".format(username))
                 else:
                     print("You're already unfollowing {}".format(username))
@@ -207,12 +243,10 @@ class InstagramBot():
             except Exception as identifier:
                 pass
 
-            followings.append(userLink)
-
-            if (len(followings) == max):
+            if (len(unfollowings) == max):
                 break
 
-        return followings
+        self.generateExcelReport("unfollow-from-following-{}".format(username, datetime.today().strftime("%d-%m-%Y")), unfollowers)
 
     def closeBrowser(self):
         self.browser.close()
@@ -280,7 +314,14 @@ class InstagramBot():
 
             return self.askOptions()
         elif option == 6:
-            return self.closeBrowser()
+            self.closeBrowser()
+
+            print("\n")
+            print("=================================================")
+            print("===== Terimakasih, hati hati kena banned ya =====")
+            print("=================================================")
+
+            return True
         else:
             print("=========================================")
             print("Milih yang bener dong, sesuain nomernya")
