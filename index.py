@@ -10,6 +10,7 @@ import traceback
 import xlsxwriter
 import time
 import os
+import pandas as pd
 
 
 class InstagramBot():
@@ -248,6 +249,69 @@ class InstagramBot():
 
         self.generateExcelReport("unfollow-from-following-{}".format(username, datetime.today().strftime("%d-%m-%Y")), unfollowers)
 
+    def getFollowers(self, username, max):
+        self.browser.get('https://www.instagram.com/' + username)
+        followersLink = self.browser.find_element_by_css_selector('ul li a')
+        followersLink.click()
+        time.sleep(2)
+
+        followersList = self.browser.find_element_by_css_selector(
+            'div[role=\'dialog\'] ul')
+
+        numberOfFollowersInList = len(
+            followersList.find_elements_by_css_selector('li'))
+
+        followersList.click()
+        actionChain = webdriver.ActionChains(self.browser)
+        while (numberOfFollowersInList < max):
+            actionChain.key_down(Keys.CONTROL).click(
+                followersList).key_up(Keys.CONTROL).perform()
+
+            actionChain.key_down(Keys.SPACE).key_up(Keys.SPACE).perform()
+            numberOfFollowersInList = len(
+                followersList.find_elements_by_css_selector('li'))
+
+        followers = []
+        for user in followersList.find_elements_by_css_selector('li'):
+            userLink = user.find_element_by_css_selector(
+                'a').get_attribute('href')
+            followers.append(userLink)
+
+            if (len(followers) == max):
+                break
+
+        self.generateExcelReport("list followers {} - {}".format(username, datetime.today().strftime("%d-%m-%Y")), followers)
+
+    def batchFollow(self, file, minimal_follower, minimal_post):
+        dfs = pd.read_excel("./seeds/{}".format(file), sheet_name="Sheet1")
+    
+        for i in dfs.index:
+            self.browser.get(dfs['Link'][i])
+            time.sleep(2)
+
+            followButton = self.browserWait.until(
+                presence_of_all_elements_located((By.CLASS_NAME, "_5f5mN")))[0]
+
+            followersSpan = self.browserWait.until(
+                presence_of_all_elements_located((By.CLASS_NAME, "g47SY")))[0]
+
+            postsSpan = self.browserWait.until(
+                presence_of_all_elements_located((By.CLASS_NAME, "g47SY")))[0]
+
+            if int(followersSpan.text) < int(minimal_follower):
+                return print("Gagal mengikuti {}, karena followers kurang dari {}".format(username, minimal_follower))
+
+            if int(postsSpan.text) < int(minimal_post):
+                return print("Gagal mengikuti {}, karena posts kurang dari {}".format(username, minimal_post))
+
+            if followButton.text != "Following":
+                followButton.click()
+                time.sleep(2)
+
+                print("Success following {}".format(username))
+            else:
+                print("You're already following {}".format(username))
+
     def closeBrowser(self):
         self.browser.close()
 
@@ -261,7 +325,9 @@ class InstagramBot():
         print("3. Follow user dari kompetitor mu")
         print("4. Follow user dari postingan dengan hastag tertentu")
         print("5. Unfollow user dari daftar following")
-        print("6. Udahan ah males mau pake aplikasi ini")
+        print("6. Ambil daftar follower dari kompetitor")
+        print("7. Batch follow")
+        print("8. Udahan ah males mau pake aplikasi ini")
 
         option = int(input("Kamu pilih yang mana? : "))
 
@@ -314,6 +380,23 @@ class InstagramBot():
 
             return self.askOptions()
         elif option == 6:
+            username = input("Masukkan username kompetitor mu : ")
+            max = int(input("Berapa orang yang ingin kamu dapatkan? : "))
+            
+            print("Tunggu ya lagi proses...", )
+            self.getFollowers(username, max)
+
+            return self.askOptions()
+        elif option == 7:
+            file = input("Masukkan nama file nya : ")
+            minimal_follower = input("Masukkan minimal followers : ")
+            minimal_post = input("Masukkan minimal postingan : ")
+
+            print("Tunggu ya lagi proses...", )
+            self.batchFollow(file, minimal_follower, minimal_post)
+
+            return self.askOptions()
+        elif option == 8:
             self.closeBrowser()
 
             print("\n")
@@ -351,8 +434,3 @@ if __name__ == "__main__":
     else:
         print("Ada yang salah dengan username dan password yang dimasukkan")
         bot.closeBrowser()
-
-    # bot.followWithUsername("gogarmen")
-    # bot.unfollowWithUsername("gogarmen")
-    # bot.followFromAutoherUser("gogarmen", 10)
-    # bot.followFormTag("sablon", 40)
