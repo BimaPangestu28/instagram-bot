@@ -76,7 +76,11 @@ class InstagramBot():
         self.browser.get("https://www.instagram.com/{}/".format(username))
         time.sleep(2)
 
-        followButton = self.browserWait.until(
+        try:
+            followButton = self.browserWait.until(
+            presence_of_all_elements_located((By.CLASS_NAME, "BY3EC")))[0]
+        except Exception as identifier:
+            followButton = self.browserWait.until(
             presence_of_all_elements_located((By.CLASS_NAME, "_5f5mN")))[0]
 
         if followButton.text != "Following":
@@ -91,7 +95,11 @@ class InstagramBot():
         self.browser.get("https://www.instagram.com/{}/".format(username))
         time.sleep(2)
 
-        followButton = self.browserWait.until(
+        try:
+            followButton = self.browserWait.until(
+            presence_of_all_elements_located((By.CLASS_NAME, "BY3EC")))[0]
+        except Exception as identifier:
+            followButton = self.browserWait.until(
             presence_of_all_elements_located((By.CLASS_NAME, "_5f5mN")))[0]
 
         if followButton.text == "Following":
@@ -119,6 +127,7 @@ class InstagramBot():
 
         urls = []
 
+        # Looping post data
         for post in self.browser.find_elements_by_class_name("v1Nh3"):
             post.click()
 
@@ -226,28 +235,29 @@ class InstagramBot():
             try:
                 unfollowButton = user.find_element_by_xpath(
                     "div/div[2]/button")
-
-                if unfollowButton.text == "Following":
-                    unfollowButton.click()
-
-                    confirmationButton = self.browserWait.until(
-                        presence_of_element_located((By.CLASS_NAME, '-Cab_')))
-                    confirmationButton.click()
-
-                    unfollowings.append(userLink)
-
-                    print("Success unfollowing {}".format(username))
-                else:
-                    print("You're already unfollowing {}".format(username))
-
-                time.sleep(interval)
             except Exception as identifier:
-                pass
+                unfollowButton = user.find_element_by_xpath(
+                    "div/div[3]/button")
+
+            if unfollowButton.text == "Following":
+                unfollowButton.click()
+
+                confirmationButton = self.browserWait.until(
+                    presence_of_element_located((By.CLASS_NAME, '-Cab_')))
+                confirmationButton.click()
+
+                unfollowings.append(userLink)
+
+                print("Success unfollowing {}".format(username))
+            else:
+                print("You're already unfollowing {}".format(username))
+
+            time.sleep(interval)
 
             if (len(unfollowings) == max):
                 break
 
-        self.generateExcelReport("unfollow-from-following-{}".format(username, datetime.today().strftime("%d-%m-%Y")), unfollowers)
+        self.generateExcelReport("unfollow-from-following-{}".format(username, datetime.today().strftime("%d-%m-%Y")), unfollowings)
 
     def getFollowers(self, username, max):
         self.browser.get('https://www.instagram.com/' + username)
@@ -282,35 +292,64 @@ class InstagramBot():
 
         self.generateExcelReport("list followers {} - {}".format(username, datetime.today().strftime("%d-%m-%Y")), followers)
 
-    def batchFollow(self, file, minimal_follower, minimal_post):
+    def batchFollow(self, file, minimal_follower, minimal_post, total_like):
         dfs = pd.read_excel("./seeds/{}".format(file), sheet_name="Sheet1")
     
         for i in dfs.index:
             self.browser.get(dfs['Link'][i])
             time.sleep(2)
 
-            followButton = self.browserWait.until(
-                presence_of_all_elements_located((By.CLASS_NAME, "_5f5mN")))[0]
+            try:
+                try:
+                    followButton = self.browserWait.until(
+                    presence_of_all_elements_located((By.CLASS_NAME, "BY3EC")))[0]
+                except Exception as identifier:
+                    followButton = self.browserWait.until(
+                    presence_of_all_elements_located((By.CLASS_NAME, "_5f5mN")))[0]
 
-            followersSpan = self.browserWait.until(
-                presence_of_all_elements_located((By.CLASS_NAME, "g47SY")))[0]
+                followersSpan = self.browserWait.until(
+                    presence_of_all_elements_located((By.CLASS_NAME, "g47SY")))[1]
 
-            postsSpan = self.browserWait.until(
-                presence_of_all_elements_located((By.CLASS_NAME, "g47SY")))[0]
+                postsSpan = self.browserWait.until(
+                    presence_of_all_elements_located((By.CLASS_NAME, "g47SY")))[0]
 
-            if int(followersSpan.text) < int(minimal_follower):
-                return print("Gagal mengikuti {}, karena followers kurang dari {}".format(username, minimal_follower))
+                if int(followersSpan.text.replace(",", "")) < int(minimal_follower):
+                    print("Gagal mengikuti {}, karena followers kurang dari {}".format(dfs['Username'][i], minimal_follower))
 
-            if int(postsSpan.text) < int(minimal_post):
-                return print("Gagal mengikuti {}, karena posts kurang dari {}".format(username, minimal_post))
+                elif int(postsSpan.text.replace(",", "")) < int(minimal_post):
+                    print("Gagal mengikuti {}, karena posts kurang dari {}".format(dfs['Username'][i], minimal_post))
 
-            if followButton.text != "Following":
-                followButton.click()
-                time.sleep(2)
+                elif followButton.text != "Following":
+                    followButton.click()
+                    time.sleep(2)
 
-                print("Success following {}".format(username))
-            else:
-                print("You're already following {}".format(username))
+                    i = 0
+
+                    # Looping postingan
+                    for post in self.browser.find_elements_by_class_name("v1Nh3"):
+                        if i < total_like:
+                            i += 1
+
+                            post.click()
+
+                            likeButton = self.browserWait.until(
+                                presence_of_element_located((By.CLASS_NAME, "_8-yf5")))[5]
+                            likeButton.click()
+
+                            time.sleep(2)
+
+                            closeButton = self.browserWait.until(
+                                presence_of_all_elements_located((By.CLASS_NAME, "wpO6b")))
+                            closeButton[-1].click()
+                            time.sleep(2)
+
+                    print("Success following {}".format(dfs['Username'][i]))
+                else:
+                    print("You're already following {}".format(dfs['Username'][i]))
+
+                time.sleep(5)
+            except Exception as identifier:
+                pass
 
     def closeBrowser(self):
         self.browser.close()
@@ -329,10 +368,10 @@ class InstagramBot():
         print("7. Batch follow")
         print("8. Udahan ah males mau pake aplikasi ini")
 
-        option = int(input("Kamu pilih yang mana? : "))
+        option = int(raw_input("Kamu pilih yang mana? : "))
 
         if option == 1:
-            username = input("Masukin username nya : ")
+            username = raw_input("Masukin username nya : ")
 
             print("Tunggu ya lagi proses...")
 
@@ -340,7 +379,7 @@ class InstagramBot():
 
             return self.askOptions()
         elif option == 2:
-            username = input("Masukin username nya : ")
+            username = raw_input("Masukin username nya : ")
 
             print("Tunggu ya lagi proses...")
 
@@ -349,9 +388,9 @@ class InstagramBot():
             return self.askOptions()
         elif option == 3:
             print("Gunakan interval yang manusiawi")
-            username = input("Masukin username nya : ")
-            max = int(input("Maksimal berapa orang yang mau kamu follow? : "))
-            interval = int(input("Masukkan interval follow (dalam detik) : "))
+            username = raw_input("Masukin username nya : ")
+            max = int(raw_input("Maksimal berapa orang yang mau kamu follow? : "))
+            interval = int(raw_input("Masukkan interval follow (dalam detik) : "))
 
             print("Tunggu ya lagi proses...")
 
@@ -360,9 +399,9 @@ class InstagramBot():
             return self.askOptions()
         elif option == 4:
             print("Gunakan interval yang manusiawi")
-            tag = input("Masukin tag nya : ")
-            max = int(input("Maksimal berapa post yang mau kamu lihat? : "))
-            interval = int(input("Masukkan interval follow (dalam detik) : "))
+            tag = raw_input("Masukin tag nya : ")
+            max = int(raw_input("Maksimal berapa post yang mau kamu lihat? : "))
+            interval = int(raw_input("Masukkan interval follow (dalam detik) : "))
 
             print("Tunggu ya lagi proses...")
 
@@ -371,8 +410,8 @@ class InstagramBot():
             return self.askOptions()
         elif option == 5:
             print("Gunakan interval yang manusiawi")
-            max = int(input("Maksimal berapa orang yang mau kamu unfollow? : "))
-            interval = int(input("Masukkan interval follow (dalam detik) : "))
+            max = int(raw_input("Maksimal berapa orang yang mau kamu unfollow? : "))
+            interval = int(raw_input("Masukkan interval follow (dalam detik) : "))
 
             print("Tunggu ya lagi proses...", )
 
@@ -380,20 +419,21 @@ class InstagramBot():
 
             return self.askOptions()
         elif option == 6:
-            username = input("Masukkan username kompetitor mu : ")
-            max = int(input("Berapa orang yang ingin kamu dapatkan? : "))
+            username = raw_input("Masukkan username kompetitor mu : ")
+            max = int(raw_input("Berapa orang yang ingin kamu dapatkan? : "))
             
             print("Tunggu ya lagi proses...", )
             self.getFollowers(username, max)
 
             return self.askOptions()
         elif option == 7:
-            file = input("Masukkan nama file nya : ")
-            minimal_follower = input("Masukkan minimal followers : ")
-            minimal_post = input("Masukkan minimal postingan : ")
+            file = raw_input("Masukkan nama file nya : ")
+            minimal_follower = raw_input("Masukkan minimal followers : ")
+            minimal_post = raw_input("Masukkan minimal postingan : ")
+            total_like = raw_input("Masukkan total postingan yang ingin disukai : ")
 
             print("Tunggu ya lagi proses...", )
-            self.batchFollow(file, minimal_follower, minimal_post)
+            self.batchFollow(file, minimal_follower, minimal_post, total_like)
 
             return self.askOptions()
         elif option == 8:
@@ -418,8 +458,8 @@ class InstagramBot():
 if __name__ == "__main__":
     print("Halo! Ini adalah instagram bot untuk auto follow dan unfollow, gunakan dengan bijak. \nApabila kamu dibanned oleh pihak instagram saya selaku kreator dari bot ini tidak bertanggung jawab")
 
-    username = input("Masukkan username mu : ")
-    password = input("Masukkan password mu : ")
+    username = raw_input("Masukkan username mu : ")
+    password = raw_input("Masukkan password mu : ")
 
     bot = InstagramBot(username, password)
 
